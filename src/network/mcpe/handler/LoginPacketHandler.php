@@ -214,7 +214,8 @@ class LoginPacketHandler extends PacketHandler{
 		$mapper = new \JsonMapper;
 		$mapper->bEnforceMapType = false; //TODO: we don't really need this as an array, but right now we don't have enough models
 		$mapper->bExceptionOnMissingData = true;
-		$mapper->bExceptionOnUndefinedProperty = true;
+		//$mapper->bExceptionOnUndefinedProperty = true;
+		$mapper->bExceptionOnUndefinedProperty = false; // fix WaterdogPE login extras
 		try{
 			$clientData = $mapper->map($clientDataClaims, new ClientData);
 		}catch(\JsonMapper_Exception $e){
