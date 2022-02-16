@@ -237,7 +237,7 @@ class InventoryManager{
 			$currentItem = $inventory->getItem($slot);
 			$clientSideItem = $this->initiatedSlotChanges[$windowId][$slot] ?? null;
 			if($clientSideItem === null || !$clientSideItem->equalsExact($currentItem)){
-				$itemStackWrapper = ItemStackWrapper::legacy(TypeConverter::getInstance()->coreItemStackToNet($currentItem));
+				$itemStackWrapper = ItemStackWrapper::legacy(TypeConverter::getInstance()->coreItemStackToNet($this->session->getProtocolId(), $currentItem));
 				if($windowId === ContainerIds::OFFHAND){
 					//TODO: HACK!
 					//The client may sometimes ignore the InventorySlotPacket for the offhand slot.
@@ -267,11 +267,11 @@ class InventoryManager{
 				$this->session->sendDataPacket(InventorySlotPacket::create(
 					$windowId,
 					0,
-					ItemStackWrapper::legacy($typeConverter->coreItemStackToNet($inventory->getItem(0)))
+					ItemStackWrapper::legacy($typeConverter->coreItemStackToNet($this->session->getProtocolId(), $inventory->getItem(0)))
 				));
 			}else{
 				$this->session->sendDataPacket(InventoryContentPacket::create($windowId, array_map(function(Item $itemStack) use ($typeConverter) : ItemStackWrapper{
-					return ItemStackWrapper::legacy($typeConverter->coreItemStackToNet($itemStack));
+					return ItemStackWrapper::legacy($typeConverter->coreItemStackToNet($this->session->getProtocolId(), $itemStack));
 				}, $inventory->getContents(true))));
 			}
 		}
@@ -299,7 +299,7 @@ class InventoryManager{
 		if($selected !== $this->clientSelectedHotbarSlot){
 			$this->session->sendDataPacket(MobEquipmentPacket::create(
 				$this->player->getId(),
-				ItemStackWrapper::legacy(TypeConverter::getInstance()->coreItemStackToNet($this->player->getInventory()->getItemInHand())),
+				ItemStackWrapper::legacy(TypeConverter::getInstance()->coreItemStackToNet($this->session->getProtocolId(), $this->player->getInventory()->getItemInHand())),
 				$selected,
 				$selected,
 				ContainerIds::INVENTORY
@@ -313,7 +313,7 @@ class InventoryManager{
 
 		$nextEntryId = 1;
 		$this->session->sendDataPacket(CreativeContentPacket::create(array_map(function(Item $item) use($typeConverter, &$nextEntryId) : CreativeContentEntry{
-			return new CreativeContentEntry($nextEntryId++, $typeConverter->coreItemStackToNet($item));
+			return new CreativeContentEntry($nextEntryId++, $typeConverter->coreItemStackToNet($this->session->getProtocolId(), $item));
 		}, $this->player->isSpectator() ? [] : CreativeInventory::getInstance()->getAll())));
 	}
 }

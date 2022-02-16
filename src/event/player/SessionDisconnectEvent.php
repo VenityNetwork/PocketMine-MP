@@ -21,24 +21,20 @@
 
 declare(strict_types=1);
 
-namespace pocketmine\world\sound;
+namespace pocketmine\event\player;
 
-use pocketmine\block\Block;
-use pocketmine\math\Vector3;
-use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
-use pocketmine\network\mcpe\protocol\LevelSoundEventPacket;
-use pocketmine\network\mcpe\protocol\types\LevelSoundEvent;
+use pocketmine\event\Event;
+use pocketmine\network\mcpe\NetworkSession;
 
-class BlockPlaceSound extends MappingSound{
+class SessionDisconnectEvent extends Event{
+	/** @var NetworkSession */
+	private $session;
 
-	/** @var Block */
-	private $block;
-
-	public function __construct(Block $block){
-		$this->block = $block;
+	public function __construct(NetworkSession $session){
+		$this->session = $session;
 	}
 
-	public function encode(Vector3 $pos) : array{
-		return [LevelSoundEventPacket::nonActorSound(LevelSoundEvent::PLACE, $pos, false, RuntimeBlockMapping::getInstance()->toRuntimeId($this->block->getFullId(), $this->mappingProtocol))];
+	public function getSession() : NetworkSession{
+		return $this->session;
 	}
 }

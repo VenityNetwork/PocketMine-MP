@@ -26,6 +26,7 @@ namespace pocketmine\network\mcpe\cache;
 use pocketmine\crafting\CraftingManager;
 use pocketmine\crafting\FurnaceType;
 use pocketmine\item\Item;
+use pocketmine\network\mcpe\convert\GlobalItemTypeDictionary;
 use pocketmine\network\mcpe\convert\ItemTranslator;
 use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\protocol\CraftingDataPacket;
@@ -51,11 +52,11 @@ final class CraftingDataCache{
 
 	/**
 	 * @var CraftingDataPacket[]
-	 * @phpstan-var array<int, CraftingDataPacket>
+	 * @phpstan-var array<int, array<int, CraftingDataPacket>>
 	 */
 	private $caches = [];
 
-	public function getCache(CraftingManager $manager) : CraftingDataPacket{
+	public function getCache(int $dictionaryProtocol, CraftingManager $manager) : CraftingDataPacket{
 		$id = spl_object_id($manager);
 		if(!isset($this->caches[$id])){
 			$manager->getDestructorCallbacks()->add(function() use ($id) : void{
@@ -66,113 +67,121 @@ final class CraftingDataCache{
 			});
 			$this->caches[$id] = $this->buildCraftingDataCache($manager);
 		}
-		return $this->caches[$id];
+		return $this->caches[$id][$dictionaryProtocol];
 	}
 
 	/**
 	 * Rebuilds the cached CraftingDataPacket.
+	 *
+	 * @return CraftingDataPacket[]
 	 */
-	private function buildCraftingDataCache(CraftingManager $manager) : CraftingDataPacket{
+	private function buildCraftingDataCache(CraftingManager $manager) : array{
 		Timings::$craftingDataCacheRebuild->startTiming();
 
-		$counter = 0;
-		$nullUUID = Uuid::fromString(Uuid::NIL);
-		$converter = TypeConverter::getInstance();
-		$recipesWithTypeIds = [];
-		foreach($manager->getShapelessRecipes() as $list){
-			foreach($list as $recipe){
-				$recipesWithTypeIds[] = new ProtocolShapelessRecipe(
-					CraftingDataPacket::ENTRY_SHAPELESS,
-					Binary::writeInt(++$counter),
-					array_map(function(Item $item) use ($converter) : RecipeIngredient{
-						return $converter->coreItemStackToRecipeIngredient($item);
-					}, $recipe->getIngredientList()),
-					array_map(function(Item $item) use ($converter) : ItemStack{
-						return $converter->coreItemStackToNet($item);
-					}, $recipe->getResults()),
-					$nullUUID,
-					CraftingRecipeBlockName::CRAFTING_TABLE,
-					50,
-					$counter
-				);
-			}
-		}
-		foreach($manager->getShapedRecipes() as $list){
-			foreach($list as $recipe){
-				$inputs = [];
+		$packets = [];
 
-				for($row = 0, $height = $recipe->getHeight(); $row < $height; ++$row){
-					for($column = 0, $width = $recipe->getWidth(); $column < $width; ++$column){
-						$inputs[$row][$column] = $converter->coreItemStackToRecipeIngredient($recipe->getIngredient($column, $row));
-					}
+		foreach(GlobalItemTypeDictionary::getInstance()->getDictionaries() as $dictionaryProtocol => $unused){
+			$counter = 0;
+			$nullUUID = Uuid::fromString(Uuid::NIL);
+			$converter = TypeConverter::getInstance();
+			$recipesWithTypeIds = [];
+			foreach($manager->getShapelessRecipes() as $list){
+				foreach($list as $recipe){
+					$recipesWithTypeIds[] = new ProtocolShapelessRecipe(
+						CraftingDataPacket::ENTRY_SHAPELESS,
+						Binary::writeInt(++$counter),
+						array_map(function(Item $item) use ($dictionaryProtocol, $converter) : RecipeIngredient{
+							return $converter->coreItemStackToRecipeIngredient($dictionaryProtocol, $item);
+						}, $recipe->getIngredientList()),
+						array_map(function(Item $item) use ($dictionaryProtocol, $converter) : ItemStack{
+							return $converter->coreItemStackToNet($dictionaryProtocol, $item);
+						}, $recipe->getResults()),
+						$nullUUID,
+						CraftingRecipeBlockName::CRAFTING_TABLE,
+						50,
+						$counter
+					);
 				}
-				$recipesWithTypeIds[] = $r = new ProtocolShapedRecipe(
-					CraftingDataPacket::ENTRY_SHAPED,
-					Binary::writeInt(++$counter),
-					$inputs,
-					array_map(function(Item $item) use ($converter) : ItemStack{
-						return $converter->coreItemStackToNet($item);
-					}, $recipe->getResults()),
-					$nullUUID,
-					CraftingRecipeBlockName::CRAFTING_TABLE,
-					50,
-					$counter
-				);
 			}
-		}
+			foreach($manager->getShapedRecipes() as $list){
+				foreach($list as $recipe){
+					$inputs = [];
 
-		foreach(FurnaceType::getAll() as $furnaceType){
-			$typeTag = match($furnaceType->id()){
-				FurnaceType::FURNACE()->id() => FurnaceRecipeBlockName::FURNACE,
-				FurnaceType::BLAST_FURNACE()->id() => FurnaceRecipeBlockName::BLAST_FURNACE,
-				FurnaceType::SMOKER()->id() => FurnaceRecipeBlockName::SMOKER,
-				default => throw new AssumptionFailedError("Unreachable"),
-			};
-			foreach($manager->getFurnaceRecipeManager($furnaceType)->getAll() as $recipe){
-				$input = $converter->coreItemStackToNet($recipe->getInput());
-				$recipesWithTypeIds[] = new ProtocolFurnaceRecipe(
-					CraftingDataPacket::ENTRY_FURNACE_DATA,
-					$input->getId(),
-					$input->getMeta(),
-					$converter->coreItemStackToNet($recipe->getResult()),
-					$typeTag
-				);
+					for($row = 0, $height = $recipe->getHeight(); $row < $height; ++$row){
+						for($column = 0, $width = $recipe->getWidth(); $column < $width; ++$column){
+							$inputs[$row][$column] = $converter->coreItemStackToRecipeIngredient($dictionaryProtocol, $recipe->getIngredient($column, $row));
+						}
+					}
+					$recipesWithTypeIds[] = $r = new ProtocolShapedRecipe(
+						CraftingDataPacket::ENTRY_SHAPED,
+						Binary::writeInt(++$counter),
+						$inputs,
+						array_map(function(Item $item) use ($dictionaryProtocol, $converter) : ItemStack{
+							return $converter->coreItemStackToNet($dictionaryProtocol, $item);
+						}, $recipe->getResults()),
+						$nullUUID,
+						CraftingRecipeBlockName::CRAFTING_TABLE,
+						50,
+						$counter
+					);
+				}
 			}
-		}
 
-		$potionTypeRecipes = [];
-		foreach($manager->getPotionTypeRecipes() as $recipes){
-			foreach($recipes as $recipe){
-				$input = $converter->coreItemStackToNet($recipe->getInput());
-				$ingredient = $converter->coreItemStackToNet($recipe->getIngredient());
-				$output = $converter->coreItemStackToNet($recipe->getOutput());
-				$potionTypeRecipes[] = new ProtocolPotionTypeRecipe(
-					$input->getId(),
-					$input->getMeta(),
-					$ingredient->getId(),
-					$ingredient->getMeta(),
-					$output->getId(),
-					$output->getMeta()
-				);
+			foreach(FurnaceType::getAll() as $furnaceType){
+				$typeTag = match ($furnaceType->id()) {
+					FurnaceType::FURNACE()->id() => FurnaceRecipeBlockName::FURNACE,
+					FurnaceType::BLAST_FURNACE()->id() => FurnaceRecipeBlockName::BLAST_FURNACE,
+					FurnaceType::SMOKER()->id() => FurnaceRecipeBlockName::SMOKER,
+					default => throw new AssumptionFailedError("Unreachable"),
+				};
+				foreach($manager->getFurnaceRecipeManager($furnaceType)->getAll() as $recipe){
+					$input = $converter->coreItemStackToNet($dictionaryProtocol, $recipe->getInput());
+					$recipesWithTypeIds[] = new ProtocolFurnaceRecipe(
+						CraftingDataPacket::ENTRY_FURNACE_DATA,
+						$input->getId(),
+						$input->getMeta(),
+						$converter->coreItemStackToNet($dictionaryProtocol, $recipe->getResult()),
+						$typeTag
+					);
+				}
 			}
-		}
 
-		$potionContainerChangeRecipes = [];
-		$itemTranslator = ItemTranslator::getInstance();
-		foreach($manager->getPotionContainerChangeRecipes() as $recipes){
-			foreach($recipes as $recipe){
-				$input = $itemTranslator->toNetworkId($recipe->getInputItemId(), 0);
-				$ingredient = $itemTranslator->toNetworkId($recipe->getIngredient()->getId(), 0);
-				$output = $itemTranslator->toNetworkId($recipe->getOutputItemId(), 0);
-				$potionContainerChangeRecipes[] = new ProtocolPotionContainerChangeRecipe(
-					$input[0],
-					$ingredient[0],
-					$output[0]
-				);
+			$potionTypeRecipes = [];
+			foreach($manager->getPotionTypeRecipes() as $recipes){
+				foreach($recipes as $recipe){
+					$input = $converter->coreItemStackToNet($dictionaryProtocol, $recipe->getInput());
+					$ingredient = $converter->coreItemStackToNet($dictionaryProtocol, $recipe->getIngredient());
+					$output = $converter->coreItemStackToNet($dictionaryProtocol, $recipe->getOutput());
+					$potionTypeRecipes[] = new ProtocolPotionTypeRecipe(
+						$input->getId(),
+						$input->getMeta(),
+						$ingredient->getId(),
+						$ingredient->getMeta(),
+						$output->getId(),
+						$output->getMeta()
+					);
+				}
 			}
+
+			$potionContainerChangeRecipes = [];
+			$itemTranslator = ItemTranslator::getInstance();
+			foreach($manager->getPotionContainerChangeRecipes() as $recipes){
+				foreach($recipes as $recipe){
+					$input = $itemTranslator->toNetworkId($dictionaryProtocol, $recipe->getInputItemId(), 0);
+					$ingredient = $itemTranslator->toNetworkId($dictionaryProtocol, $recipe->getIngredient()->getId(), 0);
+					$output = $itemTranslator->toNetworkId($dictionaryProtocol, $recipe->getOutputItemId(), 0);
+					$potionContainerChangeRecipes[] = new ProtocolPotionContainerChangeRecipe(
+						$input[0],
+						$ingredient[0],
+						$output[0]
+					);
+				}
+			}
+
+			$packets[$dictionaryProtocol] = CraftingDataPacket::create($recipesWithTypeIds, $potionTypeRecipes, $potionContainerChangeRecipes, [], true);
 		}
 
 		Timings::$craftingDataCacheRebuild->stopTiming();
-		return CraftingDataPacket::create($recipesWithTypeIds, $potionTypeRecipes, $potionContainerChangeRecipes, [], true);
+		return $packets;
 	}
 }

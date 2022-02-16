@@ -21,24 +21,22 @@
 
 declare(strict_types=1);
 
-namespace pocketmine\world\sound;
+namespace pocketmine\world\particle;
 
 use pocketmine\block\Block;
-use pocketmine\math\Vector3;
-use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
-use pocketmine\network\mcpe\protocol\LevelSoundEventPacket;
-use pocketmine\network\mcpe\protocol\types\LevelSoundEvent;
 
-class BlockPlaceSound extends MappingSound{
+abstract class MappingParticle implements Particle{
 
+	/** @var int */
+	protected $mappingProtocol;
 	/** @var Block */
-	private $block;
+	protected $block;
 
-	public function __construct(Block $block){
-		$this->block = $block;
+	public function __construct(Block $b){
+		$this->block = $b;
 	}
 
-	public function encode(Vector3 $pos) : array{
-		return [LevelSoundEventPacket::nonActorSound(LevelSoundEvent::PLACE, $pos, false, RuntimeBlockMapping::getInstance()->toRuntimeId($this->block->getFullId(), $this->mappingProtocol))];
+	public function setMappingProtocol(int $mappingProtocol) : void{
+		$this->mappingProtocol = $mappingProtocol;
 	}
 }

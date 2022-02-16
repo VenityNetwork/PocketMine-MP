@@ -24,7 +24,6 @@ declare(strict_types=1);
 namespace pocketmine\network\mcpe\convert;
 
 use pocketmine\data\bedrock\LegacyItemIdToStringIdMap;
-use pocketmine\network\mcpe\protocol\serializer\ItemTypeDictionary;
 use pocketmine\utils\AssumptionFailedError;
 use pocketmine\utils\SingletonTrait;
 use pocketmine\utils\Utils;
@@ -43,26 +42,26 @@ final class ItemTranslator{
 	use SingletonTrait;
 
 	/**
-	 * @var int[]
-	 * @phpstan-var array<int, int>
+	 * @var int[][]
+	 * @phpstan-var array<int, array<int, int>>
 	 */
 	private $simpleCoreToNetMapping = [];
 	/**
-	 * @var int[]
-	 * @phpstan-var array<int, int>
+	 * @var int[][]
+	 * @phpstan-var array<int, array<int, int>>
 	 */
 	private $simpleNetToCoreMapping = [];
 
 	/**
 	 * runtimeId = array[internalId][metadata]
-	 * @var int[][]
-	 * @phpstan-var array<int, array<int, int>>
+	 * @var int[][][]
+	 * @phpstan-var array<int, array<int, array<int, int>>>
 	 */
 	private $complexCoreToNetMapping = [];
 	/**
 	 * [internalId, metadata] = array[runtimeId]
-	 * @var int[][]
-	 * @phpstan-var array<int, array{int, int}>
+	 * @var int[][][]
+	 * @phpstan-var array<int, array<int, array{int, int}>>
 	 */
 	private $complexNetToCoreMapping = [];
 
@@ -114,7 +113,7 @@ final class ItemTranslator{
 			}
 		}
 
-		return new self(GlobalItemTypeDictionary::getInstance()->getDictionary(), $simpleMappings, $complexMappings);
+		return new self(GlobalItemTypeDictionary::getInstance(), $simpleMappings, $complexMappings);
 	}
 
 	/**
@@ -123,20 +122,22 @@ final class ItemTranslator{
 	 * @phpstan-param array<string, int> $simpleMappings
 	 * @phpstan-param array<string, array<int, int>> $complexMappings
 	 */
-	public function __construct(ItemTypeDictionary $dictionary, array $simpleMappings, array $complexMappings){
-		foreach($dictionary->getEntries() as $entry){
-			$stringId = $entry->getStringId();
-			$netId = $entry->getNumericId();
-			if(isset($complexMappings[$stringId])){
-				[$id, $meta] = $complexMappings[$stringId];
-				$this->complexCoreToNetMapping[$id][$meta] = $netId;
-				$this->complexNetToCoreMapping[$netId] = [$id, $meta];
-			}elseif(isset($simpleMappings[$stringId])){
-				$this->simpleCoreToNetMapping[$simpleMappings[$stringId]] = $netId;
-				$this->simpleNetToCoreMapping[$netId] = $simpleMappings[$stringId];
-			}else{
-				//not all items have a legacy mapping - for now, we only support the ones that do
-				continue;
+	public function __construct(GlobalItemTypeDictionary $dictionaries, array $simpleMappings, array $complexMappings){
+		foreach($dictionaries->getDictionaries() as $dictionaryProtocol => $dictionary){
+			foreach($dictionary->getEntries() as $entry){
+				$stringId = $entry->getStringId();
+				$netId = $entry->getNumericId();
+				if(isset($complexMappings[$stringId])){
+					[$id, $meta] = $complexMappings[$stringId];
+					$this->complexCoreToNetMapping[$dictionaryProtocol][$id][$meta] = $netId;
+					$this->complexNetToCoreMapping[$dictionaryProtocol][$netId] = [$id, $meta];
+				}elseif(isset($simpleMappings[$stringId])){
+					$this->simpleCoreToNetMapping[$dictionaryProtocol][$simpleMappings[$stringId]] = $netId;
+					$this->simpleNetToCoreMapping[$dictionaryProtocol][$netId] = $simpleMappings[$stringId];
+				}else{
+					//not all items have a legacy mapping - for now, we only support the ones that do
+					continue;
+				}
 			}
 		}
 	}
@@ -145,15 +146,15 @@ final class ItemTranslator{
 	 * @return int[]|null
 	 * @phpstan-return array{int, int}|null
 	 */
-	public function toNetworkIdQuiet(int $internalId, int $internalMeta) : ?array{
+	public function toNetworkIdQuiet(int $dictionaryProtocol, int $internalId, int $internalMeta) : ?array{
 		if($internalMeta === -1){
 			$internalMeta = 0x7fff;
 		}
-		if(isset($this->complexCoreToNetMapping[$internalId][$internalMeta])){
-			return [$this->complexCoreToNetMapping[$internalId][$internalMeta], 0];
+		if(isset($this->complexCoreToNetMapping[$dictionaryProtocol][$internalId][$internalMeta])){
+			return [$this->complexCoreToNetMapping[$dictionaryProtocol][$internalId][$internalMeta], 0];
 		}
-		if(array_key_exists($internalId, $this->simpleCoreToNetMapping)){
-			return [$this->simpleCoreToNetMapping[$internalId], $internalMeta];
+		if(array_key_exists($internalId, $this->simpleCoreToNetMapping[$dictionaryProtocol])){
+			return [$this->simpleCoreToNetMapping[$dictionaryProtocol][$internalId], $internalMeta];
 		}
 
 		return null;
@@ -163,8 +164,8 @@ final class ItemTranslator{
 	 * @return int[]
 	 * @phpstan-return array{int, int}
 	 */
-	public function toNetworkId(int $internalId, int $internalMeta) : array{
-		return $this->toNetworkIdQuiet($internalId, $internalMeta) ??
+	public function toNetworkId(int $dictionaryProtocol, int $internalId, int $internalMeta) : array{
+		return $this->toNetworkIdQuiet($dictionaryProtocol, $internalId, $internalMeta) ??
 			throw new \InvalidArgumentException("Unmapped ID/metadata combination $internalId:$internalMeta");
 	}
 
@@ -173,17 +174,17 @@ final class ItemTranslator{
 	 * @phpstan-return array{int, int}
 	 * @throws TypeConversionException
 	 */
-	public function fromNetworkId(int $networkId, int $networkMeta, ?bool &$isComplexMapping = null) : array{
-		if(isset($this->complexNetToCoreMapping[$networkId])){
+	public function fromNetworkId(int $dictionaryProtocol, int $networkId, int $networkMeta, ?bool &$isComplexMapping = null) : array{
+		if(isset($this->complexNetToCoreMapping[$dictionaryProtocol][$networkId])){
 			if($networkMeta !== 0){
 				throw new TypeConversionException("Unexpected non-zero network meta on complex item mapping");
 			}
 			$isComplexMapping = true;
-			return $this->complexNetToCoreMapping[$networkId];
+			return $this->complexNetToCoreMapping[$dictionaryProtocol][$networkId];
 		}
 		$isComplexMapping = false;
-		if(isset($this->simpleNetToCoreMapping[$networkId])){
-			return [$this->simpleNetToCoreMapping[$networkId], $networkMeta];
+		if(isset($this->simpleNetToCoreMapping[$dictionaryProtocol][$networkId])){
+			return [$this->simpleNetToCoreMapping[$dictionaryProtocol][$networkId], $networkMeta];
 		}
 		throw new TypeConversionException("Unmapped network ID/metadata combination $networkId:$networkMeta");
 	}
@@ -193,12 +194,12 @@ final class ItemTranslator{
 	 * @phpstan-return array{int, int}
 	 * @throws TypeConversionException
 	 */
-	public function fromNetworkIdWithWildcardHandling(int $networkId, int $networkMeta) : array{
+	public function fromNetworkIdWithWildcardHandling(int $dictionaryProtocol, int $networkId, int $networkMeta) : array{
 		$isComplexMapping = false;
 		if($networkMeta !== 0x7fff){
-			return $this->fromNetworkId($networkId, $networkMeta);
+			return $this->fromNetworkId($dictionaryProtocol, $networkId, $networkMeta);
 		}
-		[$id, $meta] = $this->fromNetworkId($networkId, 0, $isComplexMapping);
+		[$id, $meta] = $this->fromNetworkId($dictionaryProtocol, $networkId, 0, $isComplexMapping);
 		return [$id, $isComplexMapping ? $meta : -1];
 	}
 }

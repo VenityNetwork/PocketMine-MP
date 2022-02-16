@@ -472,7 +472,7 @@ class Human extends Living implements ProjectileSource, InventoryHolder{
 			$this->location->pitch,
 			$this->location->yaw,
 			$this->location->yaw, //TODO: head yaw
-			ItemStackWrapper::legacy(TypeConverter::getInstance()->coreItemStackToNet($this->getInventory()->getItemInHand())),
+			ItemStackWrapper::legacy(TypeConverter::getInstance()->coreItemStackToNet($player->getNetworkSession()->getProtocolId(), $this->getInventory()->getItemInHand())),
 			$this->getAllNetworkData(),
 			AdventureSettingsPacket::create(0, 0, 0, 0, 0, $this->getId()), //TODO
 			[], //TODO: entity links

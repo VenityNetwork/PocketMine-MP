@@ -28,8 +28,10 @@ use pocketmine\network\mcpe\compression\Compressor;
 use pocketmine\network\mcpe\convert\GlobalItemTypeDictionary;
 use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
 use pocketmine\network\mcpe\protocol\LevelChunkPacket;
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\PacketBatch;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializerContext;
+use pocketmine\network\mcpe\protocol\types\DimensionIds;
 use pocketmine\network\mcpe\serializer\ChunkSerializer;
 use pocketmine\scheduler\AsyncTask;
 use pocketmine\world\format\Chunk;
@@ -48,6 +50,8 @@ class ChunkRequestTask extends AsyncTask{
 
 	/** @var Compressor */
 	protected $compressor;
+	/** @var int */
+	protected $mappingProtocol;
 
 	/** @var string */
 	private $tiles = "";
@@ -55,8 +59,9 @@ class ChunkRequestTask extends AsyncTask{
 	/**
 	 * @phpstan-param (\Closure() : void)|null $onError
 	 */
-	public function __construct(int $chunkX, int $chunkZ, Chunk $chunk, CompressBatchPromise $promise, Compressor $compressor, ?\Closure $onError = null){
+	public function __construct(int $chunkX, int $chunkZ, Chunk $chunk, int $mappingProtocol, CompressBatchPromise $promise, Compressor $compressor, ?\Closure $onError = null){
 		$this->compressor = $compressor;
+		$this->mappingProtocol = $mappingProtocol;
 
 		$this->chunk = FastChunkSerializer::serializeTerrain($chunk);
 		$this->chunkX = $chunkX;
@@ -69,10 +74,21 @@ class ChunkRequestTask extends AsyncTask{
 
 	public function onRun() : void{
 		$chunk = FastChunkSerializer::deserializeTerrain($this->chunk);
-		$subCount = ChunkSerializer::getSubChunkCount($chunk) + ChunkSerializer::LOWER_PADDING_SIZE;
-		$encoderContext = new PacketSerializerContext(GlobalItemTypeDictionary::getInstance()->getDictionary());
-		$payload = ChunkSerializer::serializeFullChunk($chunk, RuntimeBlockMapping::getInstance(), $encoderContext, $this->tiles);
-		$this->setResult($this->compressor->compress(PacketBatch::fromPackets($encoderContext, LevelChunkPacket::create($this->chunkX, $this->chunkZ, $subCount, false, null, $payload))->getBuffer()));
+
+		if($this->mappingProtocol >= ProtocolInfo::PROTOCOL_1_18_0 && $chunk->getDimensionId() === DimensionIds::OVERWORLD){
+			$subCount = ChunkSerializer::getSubChunkCount($chunk) + ChunkSerializer::LOWER_PADDING_SIZE;
+		}else{
+			$subCount = ChunkSerializer::getSubChunkCount($chunk);
+		}
+		$encoderContext = new PacketSerializerContext(GlobalItemTypeDictionary::getInstance()->getDictionary(GlobalItemTypeDictionary::getDictionaryProtocol($this->mappingProtocol)));
+		$payload = ChunkSerializer::serializeFullChunk(
+			$chunk,
+			RuntimeBlockMapping::getInstance(),
+			$encoderContext,
+			$this->mappingProtocol,
+			$this->tiles
+		);
+		$this->setResult($this->compressor->compress(PacketBatch::fromPackets($this->mappingProtocol, $encoderContext, LevelChunkPacket::create($this->chunkX, $this->chunkZ, $subCount, false, null, $payload))->getBuffer()));
 	}
 
 	public function onError() : void{

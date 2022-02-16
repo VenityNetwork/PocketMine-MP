@@ -30,6 +30,7 @@ use pocketmine\entity\Entity;
 use pocketmine\entity\Human;
 use pocketmine\entity\Living;
 use pocketmine\event\player\PlayerDuplicateLoginEvent;
+use pocketmine\event\player\SessionDisconnectEvent;
 use pocketmine\event\server\DataPacketReceiveEvent;
 use pocketmine\event\server\DataPacketSendEvent;
 use pocketmine\form\Form;
@@ -74,6 +75,7 @@ use pocketmine\network\mcpe\protocol\PacketDecodeException;
 use pocketmine\network\mcpe\protocol\PacketPool;
 use pocketmine\network\mcpe\protocol\PlayerListPacket;
 use pocketmine\network\mcpe\protocol\PlayStatusPacket;
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\RemoveActorPacket;
 use pocketmine\network\mcpe\protocol\serializer\PacketBatch;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
@@ -101,6 +103,7 @@ use pocketmine\network\mcpe\protocol\types\inventory\ItemStackWrapper;
 use pocketmine\network\mcpe\protocol\types\PlayerListEntry;
 use pocketmine\network\mcpe\protocol\types\PlayerPermissions;
 use pocketmine\network\mcpe\protocol\UpdateAttributesPacket;
+use pocketmine\network\mcpe\raklib\RakLibInterface;
 use pocketmine\network\NetworkSessionManager;
 use pocketmine\network\PacketHandlingException;
 use pocketmine\permission\DefaultPermissions;
@@ -125,6 +128,7 @@ use function get_class;
 use function in_array;
 use function json_encode;
 use function strlen;
+use function strpos;
 use function strtolower;
 use function substr;
 use function time;
@@ -138,14 +142,14 @@ class NetworkSession{
 	private NetworkSessionManager $manager;
 	private string $ip;
 	private int $port;
-	private ?PlayerInfo $info = null;
+	protected ?PlayerInfo $info = null;
 	private ?int $ping = null;
 
 	private ?PacketHandler $handler = null;
 
 	private bool $connected = true;
 	private bool $disconnectGuard = false;
-	private bool $loggedIn = false;
+	protected bool $loggedIn = false;
 	private bool $authenticated = false;
 	private int $connectTime;
 	private ?CompoundTag $cachedOfflinePlayerData = null;
@@ -162,6 +166,7 @@ class NetworkSession{
 	private \SplQueue $compressedQueue;
 	private Compressor $compressor;
 	private bool $forceAsyncCompression = true;
+	private ?int $protocolId = null;
 
 	private PacketPool $packetPool;
 	private PacketSerializerContext $packetSerializerContext;
@@ -318,6 +323,17 @@ class NetworkSession{
 		}
 	}
 
+	public function setProtocolId(int $protocolId) : void{
+		$this->protocolId = $protocolId;
+
+		$this->broadcaster = RakLibInterface::getBroadcaster($this->server, $protocolId);
+		$this->packetSerializerContext = new PacketSerializerContext(GlobalItemTypeDictionary::getInstance()->getDictionary(GlobalItemTypeDictionary::getDictionaryProtocol($protocolId)));
+	}
+
+	public function getProtocolId() : int{
+		return $this->protocolId ?? ProtocolInfo::CURRENT_PROTOCOL;
+	}
+
 	/**
 	 * @throws PacketHandlingException
 	 */
@@ -355,14 +371,16 @@ class NetworkSession{
 					throw new PacketHandlingException("Unknown packet received");
 				}
 				try{
-					$this->handleDataPacket($packet, $buffer);
+					$this->handleDataPacket($packet, $this->getProtocolId(), $buffer);
 				}catch(PacketHandlingException $e){
 					$this->logger->debug($packet->getName() . ": " . base64_encode($buffer));
 					throw PacketHandlingException::wrap($e, "Error processing " . $packet->getName());
 				}
 			}
 		}catch(PacketDecodeException $e){
-			$this->logger->logException($e);
+			if(strpos($e->getMessage(), "Reached limit of 500 packets in a single batch") === false){
+				$this->logger->logException($e);
+			}
 			throw PacketHandlingException::wrap($e, "Packet batch decode error");
 		}
 	}
@@ -370,7 +388,7 @@ class NetworkSession{
 	/**
 	 * @throws PacketHandlingException
 	 */
-	public function handleDataPacket(Packet $packet, string $buffer) : void{
+	public function handleDataPacket(Packet $packet, int $protocolId, string $buffer) : void{
 		if(!($packet instanceof ServerboundPacket)){
 			throw new PacketHandlingException("Unexpected non-serverbound packet");
 		}
@@ -380,6 +398,7 @@ class NetworkSession{
 
 		try{
 			$stream = PacketSerializer::decoder($buffer, 0, $this->packetSerializerContext);
+			$stream->setProtocolId($protocolId);
 			try{
 				$packet->decode($stream);
 			}catch(PacketDecodeException $e){
@@ -447,7 +466,7 @@ class NetworkSession{
 			}elseif($this->forceAsyncCompression){
 				$syncMode = false;
 			}
-			$promise = $this->server->prepareBatch(PacketBatch::fromPackets($this->packetSerializerContext, ...$this->sendBuffer), $this->compressor, $syncMode);
+			$promise = $this->server->prepareBatch(PacketBatch::fromPackets($this->getProtocolId(), $this->packetSerializerContext, ...$this->sendBuffer), $this->compressor, $syncMode);
 			$this->sendBuffer = [];
 			$this->queueCompressedNoBufferFlush($promise, $immediate);
 		}
@@ -510,6 +529,10 @@ class NetworkSession{
 		if($this->connected && !$this->disconnectGuard){
 			$this->disconnectGuard = true;
 			$func();
+
+			$event = new SessionDisconnectEvent($this);
+			$event->call();
+
 			$this->disconnectGuard = false;
 			foreach($this->disposeHooks as $callback){
 				$callback();
@@ -912,7 +935,7 @@ class NetworkSession{
 		Utils::validateCallableSignature(function() : void{}, $onCompletion);
 
 		$world = $this->player->getLocation()->getWorld();
-		ChunkCache::getInstance($world, $this->compressor)->request($chunkX, $chunkZ)->onResolve(
+		ChunkCache::getInstance($world, $this->compressor)->request($chunkX, $chunkZ, $this->getProtocolId())->onResolve(
 
 			//this callback may be called synchronously or asynchronously, depending on whether the promise is resolved yet
 			function(CompressBatchPromise $promise) use ($world, $onCompletion, $chunkX, $chunkZ) : void{
@@ -974,23 +997,24 @@ class NetworkSession{
 	public function onMobMainHandItemChange(Human $mob) : void{
 		//TODO: we could send zero for slot here because remote players don't need to know which slot was selected
 		$inv = $mob->getInventory();
-		$this->sendDataPacket(MobEquipmentPacket::create($mob->getId(), ItemStackWrapper::legacy(TypeConverter::getInstance()->coreItemStackToNet($inv->getItemInHand())), $inv->getHeldItemIndex(), $inv->getHeldItemIndex(), ContainerIds::INVENTORY));
+		$this->sendDataPacket(MobEquipmentPacket::create($mob->getId(), ItemStackWrapper::legacy(TypeConverter::getInstance()->coreItemStackToNet($this->getProtocolId(), $inv->getItemInHand())), $inv->getHeldItemIndex(), $inv->getHeldItemIndex(), ContainerIds::INVENTORY));
 	}
 
 	public function onMobOffHandItemChange(Human $mob) : void{
 		$inv = $mob->getOffHandInventory();
-		$this->sendDataPacket(MobEquipmentPacket::create($mob->getId(), ItemStackWrapper::legacy(TypeConverter::getInstance()->coreItemStackToNet($inv->getItem(0))), 0, 0, ContainerIds::OFFHAND));
+		$this->sendDataPacket(MobEquipmentPacket::create($mob->getId(), ItemStackWrapper::legacy(TypeConverter::getInstance()->coreItemStackToNet($this->getProtocolId(), $inv->getItem(0))), 0, 0, ContainerIds::OFFHAND));
 	}
 
 	public function onMobArmorChange(Living $mob) : void{
 		$inv = $mob->getArmorInventory();
 		$converter = TypeConverter::getInstance();
+		$protocolId = $this->getProtocolId();
 		$this->sendDataPacket(MobArmorEquipmentPacket::create(
 			$mob->getId(),
-			ItemStackWrapper::legacy($converter->coreItemStackToNet($inv->getHelmet())),
-			ItemStackWrapper::legacy($converter->coreItemStackToNet($inv->getChestplate())),
-			ItemStackWrapper::legacy($converter->coreItemStackToNet($inv->getLeggings())),
-			ItemStackWrapper::legacy($converter->coreItemStackToNet($inv->getBoots()))
+			ItemStackWrapper::legacy($converter->coreItemStackToNet($protocolId, $inv->getHelmet())),
+			ItemStackWrapper::legacy($converter->coreItemStackToNet($protocolId, $inv->getChestplate())),
+			ItemStackWrapper::legacy($converter->coreItemStackToNet($protocolId, $inv->getLeggings())),
+			ItemStackWrapper::legacy($converter->coreItemStackToNet($protocolId, $inv->getBoots()))
 		));
 	}
 

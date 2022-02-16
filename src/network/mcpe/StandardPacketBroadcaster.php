@@ -31,9 +31,12 @@ final class StandardPacketBroadcaster implements PacketBroadcaster{
 
 	/** @var Server */
 	private $server;
+	/** @var int */
+	private $protocolId;
 
-	public function __construct(Server $server){
+	public function __construct(Server $server, int $protocolId){
 		$this->server = $server;
+		$this->protocolId = $protocolId;
 	}
 
 	public function broadcastPackets(array $recipients, array $packets) : void{
@@ -44,7 +47,7 @@ final class StandardPacketBroadcaster implements PacketBroadcaster{
 			$serializerContext = $recipient->getPacketSerializerContext();
 			$bufferId = spl_object_id($serializerContext);
 			if(!isset($buffers[$bufferId])){
-				$buffers[$bufferId] = PacketBatch::fromPackets($serializerContext, ...$packets);
+				$buffers[$bufferId] = PacketBatch::fromPackets($this->protocolId, $serializerContext, ...$packets);
 			}
 
 			//TODO: different compressors might be compatible, it might not be necessary to split them up by object

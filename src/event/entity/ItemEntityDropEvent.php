@@ -21,24 +21,26 @@
 
 declare(strict_types=1);
 
-namespace pocketmine\world\sound;
+namespace pocketmine\event\entity;
 
-use pocketmine\block\Block;
-use pocketmine\math\Vector3;
-use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
-use pocketmine\network\mcpe\protocol\LevelSoundEventPacket;
-use pocketmine\network\mcpe\protocol\types\LevelSoundEvent;
+use pocketmine\entity\object\ItemEntity;
+use pocketmine\event\Cancellable;
+use pocketmine\event\CancellableTrait;
 
-class BlockPlaceSound extends MappingSound{
+/**
+ * @phpstan-extends EntityEvent<ItemEntity>
+ */
+class ItemEntityDropEvent extends EntityEvent implements Cancellable{
+	use CancellableTrait;
 
-	/** @var Block */
-	private $block;
-
-	public function __construct(Block $block){
-		$this->block = $block;
+	public function __construct(ItemEntity $item){
+		$this->entity = $item;
 	}
 
-	public function encode(Vector3 $pos) : array{
-		return [LevelSoundEventPacket::nonActorSound(LevelSoundEvent::PLACE, $pos, false, RuntimeBlockMapping::getInstance()->toRuntimeId($this->block->getFullId(), $this->mappingProtocol))];
+	/**
+	 * @return ItemEntity
+	 */
+	public function getEntity(){
+		return $this->entity;
 	}
 }
