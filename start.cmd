@@ -22,11 +22,11 @@ if "%PHP_BINARY%"=="" (
 	exit 1
 )
 
-if exist PocketMine-MP.phar (
-	set POCKETMINE_FILE=PocketMine-MP.phar
+if exist src\PocketMine.php (
+	set POCKETMINE_FILE=src\PocketMine.php
 ) else (
-	echo PocketMine-MP.phar not found
-	echo Downloads can be found at https://github.com/pmmp/PocketMine-MP/releases
+	echo src\PocketMine.php not found
+	echo Downloads can be found at https://github.com/VenityNetwork/PocketMine-MP
 	pause
 	exit 1
 )
@@ -37,3 +37,5 @@ if exist bin\mintty.exe (
 	REM pause on exitcode != 0 so the user can see what went wrong
 	%PHP_BINARY% %POCKETMINE_FILE% %* || pause
 )
+
+pause

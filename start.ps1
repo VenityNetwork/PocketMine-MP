@@ -21,11 +21,11 @@ if($php -ne ""){
 }
 
 if($file -eq ""){
-	if(Test-Path "PocketMine-MP.phar"){
-	    $file = "PocketMine-MP.phar"
+	if(Test-Path "src\PocketMine.php"){
+	    $file = "src\PocketMine.php"
 	}else{
-	    echo "PocketMine-MP.phar not found"
-	    echo "Downloads can be found at https://github.com/pmmp/PocketMine-MP/releases"
+	    echo "src\PocketMine.php not found"
+	    echo "Downloads can be found at https://github.com/VenityNetwork/PocketMine-MP"
 	    pause
 	    exit 1
 	}
