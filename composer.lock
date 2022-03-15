@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ee264b4662628e01f1f53a4a84c7f9a7",
+    "content-hash": "e8fc01a860a1835c2ae388a2699ce997",
     "packages": [
         {
             "name": "adhocore/json-comment",
@@ -197,85 +197,6 @@
             "time": "2021-12-11T12:41:06+00:00"
         },
         {
-<<<<<<< HEAD
-=======
-            "name": "nethergamesmc/bedrock-data",
-            "version": "dev-master",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/NetherGamesMC/BedrockData.git",
-                "reference": "6604d79822277eadd266bda191305c086228ee5f"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/NetherGamesMC/BedrockData/zipball/6604d79822277eadd266bda191305c086228ee5f",
-                "reference": "6604d79822277eadd266bda191305c086228ee5f",
-                "shasum": ""
-            },
-            "default-branch": true,
-            "type": "library",
-            "license": [
-                "CC0-1.0"
-            ],
-            "description": "Blobs of data generated from Minecraft: Bedrock Edition, used by PocketMine-MP",
-            "support": {
-                "source": "https://github.com/NetherGamesMC/BedrockData/tree/master"
-            },
-            "time": "2022-03-10T08:16:46+00:00"
-        },
-        {
-            "name": "nethergamesmc/bedrock-protocol",
-            "version": "dev-master",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/NetherGamesMC/BedrockProtocol.git",
-                "reference": "8820ae757152a9d92186b9e4741d2c66b932dc6a"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/NetherGamesMC/BedrockProtocol/zipball/8820ae757152a9d92186b9e4741d2c66b932dc6a",
-                "reference": "8820ae757152a9d92186b9e4741d2c66b932dc6a",
-                "shasum": ""
-            },
-            "require": {
-                "ext-json": "*",
-                "netresearch/jsonmapper": "^4.0",
-                "php": "^8.0",
-                "pocketmine/binaryutils": "^0.2.0",
-                "pocketmine/color": "^0.2.0",
-                "pocketmine/math": "^0.3.0 || ^0.4.0",
-                "pocketmine/nbt": "^0.3.0",
-                "ramsey/uuid": "^4.1"
-            },
-            "require-dev": {
-                "phpstan/phpstan": "1.4.8",
-                "phpstan/phpstan-phpunit": "^1.0.0",
-                "phpstan/phpstan-strict-rules": "^1.0.0",
-                "phpunit/phpunit": "^9.5"
-            },
-            "default-branch": true,
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "pocketmine\\network\\mcpe\\protocol\\": "src/"
-                }
-            },
-            "autoload-dev": {
-                "psr-4": {
-                    "pocketmine\\network\\mcpe\\protocol\\": "tests/phpunit/"
-                }
-            },
-            "license": [
-                "LGPL-3.0"
-            ],
-            "description": "An implementation of the Minecraft: Bedrock Edition protocol in PHP",
-            "support": {
-                "source": "https://github.com/NetherGamesMC/BedrockProtocol/tree/master"
-            },
-            "time": "2022-03-10T08:17:23+00:00"
-        },
-        {
->>>>>>> e65c1fd00945881493260c6ba7b3a268a9437832
             "name": "netresearch/jsonmapper",
             "version": "v4.0.0",
             "source": {
@@ -1550,14 +1471,9 @@
             "require": {
                 "php": "^7.1 || ^8.0"
             },
-<<<<<<< HEAD
-            "replace": {
-                "myclabs/deep-copy": "self.version"
-=======
             "conflict": {
                 "doctrine/collections": "<1.6.8",
                 "doctrine/common": "<2.13.3 || >=3,<3.2.2"
->>>>>>> e65c1fd00945881493260c6ba7b3a268a9437832
             },
             "require-dev": {
                 "doctrine/collections": "^1.6.8",
@@ -1715,18 +1631,6 @@
         },
         {
             "name": "phar-io/version",
-<<<<<<< HEAD
-            "version": "3.1.1",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/phar-io/version.git",
-                "reference": "15a90844ad40f127afd244c0cad228de2a80052a"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/phar-io/version/zipball/15a90844ad40f127afd244c0cad228de2a80052a",
-                "reference": "15a90844ad40f127afd244c0cad228de2a80052a",
-=======
             "version": "3.2.1",
             "source": {
                 "type": "git",
@@ -1737,7 +1641,6 @@
                 "type": "zip",
                 "url": "https://api.github.com/repos/phar-io/version/zipball/4f7fd7836c6f332bb2933569e566a0d6c4cbed74",
                 "reference": "4f7fd7836c6f332bb2933569e566a0d6c4cbed74",
->>>>>>> e65c1fd00945881493260c6ba7b3a268a9437832
                 "shasum": ""
             },
             "require": {
@@ -1773,15 +1676,9 @@
             "description": "Library for handling version information and constraints",
             "support": {
                 "issues": "https://github.com/phar-io/version/issues",
-<<<<<<< HEAD
-                "source": "https://github.com/phar-io/version/tree/3.1.1"
-            },
-            "time": "2022-02-07T21:56:48+00:00"
-=======
                 "source": "https://github.com/phar-io/version/tree/3.2.1"
             },
             "time": "2022-02-21T01:04:05+00:00"
->>>>>>> e65c1fd00945881493260c6ba7b3a268a9437832
         },
         {
             "name": "phpdocumentor/reflection-common",
