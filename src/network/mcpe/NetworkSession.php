@@ -214,7 +214,7 @@ class NetworkSession{
 				$this->logger->info("Player: " . TextFormat::AQUA . $info->getUsername() . TextFormat::RESET);
 				$this->logger->setPrefix($this->getLogPrefix());
 				if(($Waterdog_IP = $info->getExtraData()["Waterdog_IP"] ?? "") !== "") {
-					$this->ip = $Waterdog_IP;
+					$this->ip = (string) $Waterdog_IP;
 				}
 			},
 			function(bool $isAuthenticated, bool $authRequired, ?string $error, ?string $clientPubKey) : void{
