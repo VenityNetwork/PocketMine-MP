@@ -116,7 +116,7 @@ class LoginPacketHandler extends PacketHandler{
 			throw new PacketHandlingException("Invalid login UUID");
 		}
 		$uuid = Uuid::fromString($extraData->identity);
-		if(($xuid = $extraData->XUID) !== "" || ($xuid = $clientData->Waterdog_XUID ?? "") !== ""){
+		if(($xuid = $extraData->XUID) !== "" || ($xuid = (string) $clientData->Waterdog_XUID ?? "") !== ""){
 			$playerInfo = new XboxLivePlayerInfo(
 				$xuid,
 				$extraData->displayName,
