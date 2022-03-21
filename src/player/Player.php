@@ -1721,8 +1721,7 @@ class Player extends Human implements CommandSender, ChunkListener, IPlayer{
 			}
 			return false;
 		}
-		// hit sound are disabled for pvp.
-		//$this->getWorld()->addSound($soundPos, new EntityAttackSound());
+		$this->getWorld()->addSound($soundPos, new EntityAttackSound());
 
 		if($ev->getModifier(EntityDamageEvent::MODIFIER_CRITICAL) > 0 && $entity instanceof Living){
 			$entity->broadcastAnimation(new CriticalHitAnimation($entity));
